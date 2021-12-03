@@ -1,3 +1,4 @@
+from os import environ
 import boto3
 import json
 import yaml
@@ -38,7 +39,20 @@ def get_subnet_data(role, region):
                           subnet['AvailabilityZone'], subnet['SubnetId']])
 
 
-def get_route_table_data(role, region):
+{
+    "vpcid": {
+        'rt name 1': {
+            'dest': 'target',
+            'dest2': 'target2'
+        },
+        'rt name 2': {
+            'dest': 'target'
+        }
+    }
+}
+
+
+def get_route_table_data(role, accountId, region):
 
     def get_target_id(route_table):
         if 'GatewayId' in route:
@@ -57,26 +71,65 @@ def get_route_table_data(role, region):
             return route['VpcEndpointId']
 
     ws = wb.create_sheet('Route Table')
-    column_list = ['Route Table Name', 'VPC ID',
-                   'Route Table ID', 'Destination', 'Target']
+    column_list = ['Region', 'Environment', 'Account', 'VPC ID', 'Route Table Name', 'Route Table ID',
+                   'Destination', 'Target']
     ws.append(column_list)
 
-    client = boto3.client('ec2')
+    client = boto3.client('ec2', region_name=region, aws_access_key_id=role['AccessKeyId'], aws_secret_access_key=role['SecretAccessKey'],
+                          aws_session_token=role['SessionToken'])
     response = client.describe_route_tables()
+
+    row = 2
+    merge_row = 2
+    route_length = 0
+
+    output = {}
+
     for route_table in response['RouteTables']:
-        vpc_name = route_table['Tags']
-        for tag in vpc_name:
+        for tag in route_table['Tags']:
             if tag['Key'] == 'Name':
                 name = tag['Value']
-                vpc_id = route_table['VpcId']
-                route_table_id = route_table['RouteTableId']
-                dest = []
-                target = []
-                for route in route_table['Routes']:
-                    dest.append(route['DestinationCidrBlock'])
-                    target.append(get_target_id(route))
-                    ws.append([name, vpc_id, route_table_id,
-                              route['DestinationCidrBlock'], get_target_id(route)])
+                print(name)
+        if route_table['VpcId'] in output:
+            output[route_table['VpcId']][route_table['RouteTableId']
+                                         ] = {
+                                             'name': name,
+                                             'routes': route_table['Routes']
+            }
+            output[route_table['VpcId']]['route_table_length'] += len(route_table['Routes'])
+        else:
+            output[route_table['VpcId']] = {}
+            output[route_table['VpcId']]['route_table_length'] = 0
+
+    # print(json.dumps(output['vpc-088877c42caa6dd32'], indent=4))
+
+    # for vpc_id in output:
+    #     for route_table_id in output[vpc_id]:
+
+    #         for route in output[vpc_id][route_table_id]['routes']:
+    #             ws.cell(row=row, column=6).value = route_table_id
+    #             ws.cell(
+    #                 row=row, column=7).value = route['DestinationCidrBlock']
+    #             ws.cell(row=row, column=8).value = get_target_id(route)
+    #             row += 1
+    #     ws.merge_cells(start_row=merge_row,
+    #                    end_row=row - 1, start_column=4,  end_column=4)
+    #     ws.cell(row=merge_row, column=4).value = vpc_id
+    #     ws.cell(
+    #         row=row, column=5).value = output[vpc_id][route_table_id]['name']
+    #     ws.merge_cells(start_row=row,
+    #                    end_row=row - 1, start_column=5,  end_column=5)
+    #     merge_row += row - 2
+
+    # ws.merge_cells(start_row=merge_row, end_row=merge_row +
+    #                len(output)-1, start_column=1, end_column=1)
+    # ws.cell(row=2, column=1).value = region
+    # ws.merge_cells(start_row=merge_row, end_row=merge_row +
+    #                len(output)-1, start_column=2, end_column=2)
+    # ws.cell(row=2, column=2).value = environment
+    # ws.merge_cells(start_row=merge_row, end_row=merge_row +
+    #                len(output)-1, start_column=3, end_column=3)
+    # ws.cell(row=2, column=3).value = accountId
 
 
 def get_igw_data(role, region):
@@ -295,12 +348,13 @@ if __name__ == '__main__':
             ws = wb.active
             # get_vpc_data()
             # get_subnet_data()
-            # get_route_table_data()
+            get_route_table_data(role, account, region)
             # get_igw_data()
             # get_endpoint_data()
             # get_endpoint_service_data()
             # get_nat_data()
             # get_sg_data()
             # get_vpn_data()
-            get_tgw_data(role, region)
-            wb.save('{}_{}_resource.xlsx'.format(account, region_mapping[region]))
+            # get_tgw_data(role, region)
+            wb.save('{}_{}_resource.xlsx'.format(
+                account, region_mapping[region]))
