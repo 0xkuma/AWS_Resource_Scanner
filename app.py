@@ -5,6 +5,8 @@ import yaml
 from openpyxl import Workbook
 from openpyxl.styles import Alignment
 
+region_mapping = {"ap-southeast-1": 'Singapore', "ap-east-1": 'Hong Kong'}
+
 
 def get_vpc_data(role, region):
     ws = wb.create_sheet("VPC")
@@ -39,22 +41,9 @@ def get_subnet_data(role, region):
                           subnet['AvailabilityZone'], subnet['SubnetId']])
 
 
-{
-    "vpcid": {
-        'rt name 1': {
-            'dest': 'target',
-            'dest2': 'target2'
-        },
-        'rt name 2': {
-            'dest': 'target'
-        }
-    }
-}
-
-
 def get_route_table_data(role, accountId, region):
 
-    def get_target_id(route_table):
+    def get_target_id(route):
         if 'GatewayId' in route:
             return route['GatewayId']
         elif 'InstanceId' in route:
@@ -79,31 +68,77 @@ def get_route_table_data(role, accountId, region):
                           aws_session_token=role['SessionToken'])
     response = client.describe_route_tables()
 
-    row = 2
-    merge_row = 2
-    route_length = 0
-
-    output = {}
+    output = {'total': 0}
 
     for route_table in response['RouteTables']:
         for tag in route_table['Tags']:
             if tag['Key'] == 'Name':
                 name = tag['Value']
-                print(name)
         if route_table['VpcId'] in output:
             output[route_table['VpcId']][route_table['RouteTableId']
                                          ] = {
                                              'name': name,
-                                             'routes': route_table['Routes']
+                                             'routes': route_table['Routes'],
+                                             'total': len(route_table['Routes'])
             }
-            output[route_table['VpcId']]['route_table_length'] += len(route_table['Routes'])
+            output[route_table['VpcId']
+                   ]['total'] += len(route_table['Routes'])
         else:
             output[route_table['VpcId']] = {}
-            output[route_table['VpcId']]['route_table_length'] = 0
+            output[route_table['VpcId']][route_table['RouteTableId']
+                                         ] = {
+                                             'name': name,
+                                             'routes': route_table['Routes'],
+                                             'total': len(route_table['Routes'])
+            }
+            output[route_table['VpcId']
+                   ]['total'] = len(route_table['Routes'])
+        output['total'] += len(route_table['Routes'])
+    # print(json.dumps(output, indent=4))
 
-    # print(json.dumps(output['vpc-088877c42caa6dd32'], indent=4))
+    # Write to Excel
 
-    # for vpc_id in output:
+    # Region Column
+    ws.merge_cells(start_row=2, start_column=1,
+                   end_row=1 + output['total'], end_column=1)
+    ws.cell(row=2, column=1).value = region_mapping[region]
+    # Environment Column
+    ws.merge_cells(start_row=2, start_column=2,
+                   end_row=1 + output['total'], end_column=2)
+    ws.cell(row=2, column=2).value = environment
+    # Account Column
+    ws.merge_cells(start_row=2, start_column=3,
+                   end_row=1 + output['total'], end_column=3)
+    ws.cell(row=2, column=3).value = accountId
+
+    vpc_row = 2
+    route_table_row = 2
+    route_row = 2
+    for vpc_id in output:
+        if vpc_id == 'total':
+            continue
+        ws.merge_cells(start_row=vpc_row, start_column=4,
+                       end_row=vpc_row+output[vpc_id]['total'] - 1, end_column=4)
+        ws.cell(row=vpc_row, column=4).value = vpc_id
+        vpc_row += output[vpc_id]['total']
+        for route_table in output[vpc_id]:
+            if route_table == 'total':
+                continue
+            ws.merge_cells(start_row=route_table_row, start_column=5,
+                           end_row=route_table_row+output[vpc_id][route_table]['total'] - 1, end_column=5)
+            ws.cell(row=route_table_row,
+                    column=5).value = output[vpc_id][route_table]['name']
+            ws.merge_cells(start_row=route_table_row, start_column=6,
+                           end_row=route_table_row+output[vpc_id][route_table]['total'] - 1, end_column=6)
+            ws.cell(row=route_table_row,
+                    column=6).value = route_table
+            route_table_row += output[vpc_id][route_table]['total']
+            for route in output[vpc_id][route_table]['routes']:
+                ws.cell(row=route_row,
+                        column=7).value = route['DestinationCidrBlock']
+                ws.cell(row=route_row, column=8).value = get_target_id(route)
+                route_row += 1
+
     #     for route_table_id in output[vpc_id]:
 
     #         for route in output[vpc_id][route_table_id]['routes']:
@@ -328,8 +363,6 @@ def get_tgw_data(role, region):
 
 if __name__ == '__main__':
     environment = str(input('Enter the environment: '))
-
-    region_mapping = {"ap-southeast-1": 'Singapore', "ap-east-1": 'Hong Kong'}
 
     with open('./setting.yaml', 'r') as f:
         scan_list = yaml.load(f, Loader=yaml.BaseLoader)
