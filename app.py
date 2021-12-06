@@ -139,33 +139,6 @@ def get_route_table_data(role, accountId, region):
                 ws.cell(row=route_row, column=8).value = get_target_id(route)
                 route_row += 1
 
-    #     for route_table_id in output[vpc_id]:
-
-    #         for route in output[vpc_id][route_table_id]['routes']:
-    #             ws.cell(row=row, column=6).value = route_table_id
-    #             ws.cell(
-    #                 row=row, column=7).value = route['DestinationCidrBlock']
-    #             ws.cell(row=row, column=8).value = get_target_id(route)
-    #             row += 1
-    #     ws.merge_cells(start_row=merge_row,
-    #                    end_row=row - 1, start_column=4,  end_column=4)
-    #     ws.cell(row=merge_row, column=4).value = vpc_id
-    #     ws.cell(
-    #         row=row, column=5).value = output[vpc_id][route_table_id]['name']
-    #     ws.merge_cells(start_row=row,
-    #                    end_row=row - 1, start_column=5,  end_column=5)
-    #     merge_row += row - 2
-
-    # ws.merge_cells(start_row=merge_row, end_row=merge_row +
-    #                len(output)-1, start_column=1, end_column=1)
-    # ws.cell(row=2, column=1).value = region
-    # ws.merge_cells(start_row=merge_row, end_row=merge_row +
-    #                len(output)-1, start_column=2, end_column=2)
-    # ws.cell(row=2, column=2).value = environment
-    # ws.merge_cells(start_row=merge_row, end_row=merge_row +
-    #                len(output)-1, start_column=3, end_column=3)
-    # ws.cell(row=2, column=3).value = accountId
-
 
 def get_igw_data(role, accountId, region):
     ws = wb.create_sheet('Internet Gateway')
