@@ -167,9 +167,10 @@ def get_route_table_data(role, accountId, region):
     # ws.cell(row=2, column=3).value = accountId
 
 
-def get_igw_data(role, region):
+def get_igw_data(role, accountId, region):
     ws = wb.create_sheet('Internet Gateway')
-    column_list = ['Internet Gateway Name', 'Internet Gateway ID', "VPC ID"]
+    column_list = ["Region", "Environment", "Account", "Type",
+                   'IGW Name', 'IGW ID', "VPC ID"]
     ws.append(column_list)
 
     client = boto3.client('ec2', region_name=region, aws_access_key_id=role['AccessKeyId'], aws_secret_access_key=role['SecretAccessKey'],
@@ -179,8 +180,8 @@ def get_igw_data(role, region):
         igw_name = igw['Tags']
         for tag in igw_name:
             if tag['Key'] == 'Name':
-                ws.append([tag['Value'], igw['InternetGatewayId'],
-                          igw['Attachments'][0]['VpcId']])
+                ws.append([region_mapping[region], environment, accountId, 'igw', tag['Value'], igw['InternetGatewayId'],
+                           igw['Attachments'][0]['VpcId']])
 
 
 def get_endpoint_data(role, region):
@@ -381,8 +382,8 @@ if __name__ == '__main__':
             ws = wb.active
             # get_vpc_data()
             # get_subnet_data()
-            get_route_table_data(role, account, region)
-            # get_igw_data()
+            # get_route_table_data(role, account, region)
+            get_igw_data(role, account, region)
             # get_endpoint_data()
             # get_endpoint_service_data()
             # get_nat_data()
