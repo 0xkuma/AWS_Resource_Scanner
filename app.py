@@ -242,29 +242,45 @@ def get_sg_data(role, region):
                   sg['VpcId'], ingress, egress])
 
 
-def get_vpn_data(role, region):
+def get_vpn_data(role, accountId,  region):
     ws = wb.create_sheet('VPN Connection')
-    column_list = ['VPN Connection Name', 'VPN Connection ID',
-                   'Transit Gateway ID', 'Customer Gateway ID', 'Customer Gateway ID']
+    column_list = ['Region', 'Environment', 'Type', 'Ou',
+                   'Project Name', 'Location', 'Environment', 'AccountId', 'No',
+                   'VPN Connection Name', 'Description', 'VPC ID', 'VPC or TGW to be attached',
+                   'Customer Gateway', 'Customer Gateway Address', 'Public IP address', 'ASN',
+                   'Transit Gateway Attachment', 'Virtual priavte gateway']
     ws.append(column_list)
 
     client = boto3.client('ec2', region_name=region, aws_access_key_id=role['AccessKeyId'], aws_secret_access_key=role['SecretAccessKey'],
                           aws_session_token=role['SessionToken'])
     response = client.describe_vpn_connections()
     for vpn in response['VpnConnections']:
-        vpn_name = vpn['Tags']
-        for tag in vpn_name:
+
+        for tag in vpn['Tags']:
             if tag['Key'] == 'Name':
-                name = tag['Value']
-                vpn_id = vpn['VpnConnectionId']
-                tgw = vpn['TransitGatewayId']
-                cgw = vpn['CustomerGatewayId']
-                cgw_address = client.describe_customer_gateways(
-                    CustomerGatewayIds=[
-                        vpn['CustomerGatewayId']
-                    ])['CustomerGateways'][0]['IpAddress']
-                ws.append(
-                    [name, vpn_id, tgw, cgw, cgw_address])
+                vpn_name = tag['Value']
+                vpn_type, vpn_ou, vpn_project_name, vpn_location, vpn_environment, vpn_account_name, vpn_no = vpn_name.split(
+                    '-')
+
+                attached_name = [tag['Value'] for tags in client.describe_transit_gateways(
+                    Filters=[{'Name': 'transit-gateway-id', 'Values': [vpn['TransitGatewayId']]}])['TransitGateways'][0]['Tags'] if tags['Key'] == 'Name'][0]
+                customer_gateway_name = ''
+                customer_gateway_address = ''
+                public_ip_address = ''
+                asn = ''
+                virtual_private_gateway = ''
+                for cw in client.describe_customer_gateways(
+                        Filters=[{'Name': 'customer-gateway-id', 'Values': [vpn['CustomerGatewayId']]}])['CustomerGateways']:
+                    for tag in cw['Tags']:
+                        if tag['Key'] == 'Name':
+                            customer_gateway_name = tag['Value']
+                            break
+                    customer_gateway_address = cw['IpAddress']
+                    asn = cw['BgpAsn']
+                for ip in vpn['VgwTelemetry']:
+                    public_ip_address += ip['OutsideIpAddress'] + '\n'
+            ws.append([region, environment, vpn_type, vpn_ou, vpn_project_name,
+                       vpn_location, vpn_environment, accountId, vpn_no, vpn_name, "", "", attached_name, customer_gateway_name, customer_gateway_address, public_ip_address, asn, "", virtual_private_gateway])
 
 
 def get_tgw_data(role, region):
@@ -356,12 +372,12 @@ if __name__ == '__main__':
             # get_vpc_data()
             # get_subnet_data()
             # get_route_table_data(role, account, region)
-            get_igw_data(role, account, region)
+            # get_igw_data(role, account, region)
             # get_endpoint_data()
             # get_endpoint_service_data()
             # get_nat_data()
             # get_sg_data()
-            # get_vpn_data()
+            get_vpn_data(role, account, region)
             # get_tgw_data(role, region)
             wb.save('{}_{}_resource.xlsx'.format(
                 account, region_mapping[region]))
